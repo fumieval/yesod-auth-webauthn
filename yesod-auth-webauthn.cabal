@@ -24,27 +24,28 @@ library
   build-depends:       base ^>=4.12.0.0
     , bytestring
     , conduit
+    , cryptonite
     , yesod-core
     , yesod-auth
     , serialise
-    , stm
-    , unordered-containers
     , text
     , aeson
     , shakespeare
     , webauthn
+    , x509
   hs-source-dirs:      src
+  ghc-options: -Wall -Wcompat
   default-language:    Haskell2010
 
 executable yesod-webauthn-example
   main-is: example.hs
-  ghc-options: -Wall -O2 -Wcompat
   build-depends:
       yesod-core
     , base >=4.7 && <5
     , yesod-auth
     , shakespeare
     , text
+    , unordered-containers
     , http-conduit
     , warp
     , warp-tls
@@ -52,4 +53,6 @@ executable yesod-webauthn-example
     , yesod-auth-webauthn
     , yesod-form
     , webauthn
+    , x509
+    , cryptonite
   default-language: Haskell2010
