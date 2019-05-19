@@ -53,7 +53,7 @@ instance YesodAuthWebAuthn WAuth where
   webAuthnLookupPubKey cid = case HM.lookup cid authorisedKeys of
     Nothing -> permissionDenied "Unauthorised"
     Just pub -> return pub
-  webAuthnAddCredential cid pub = liftIO $ print (cid, pub)
+  webAuthnAddCredential _ cid pub = liftIO $ print (cid, pub)
 
 authorisedKeys :: HM.HashMap CredentialId CredentialPublicKey
 authorisedKeys = HM.fromList [(CredentialId {unCredentialId = "\145\r\130\184\SO;\145\138\198'|H\171F\230\135_\129\207\232\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"},CredentialPublicKey {unCredentialPublicKey = "\165\SOH\STX\ETX& \SOH!X n\144*\205\236\199eh\253\RS\DC4S\248\129\GS+tq\227\t\162\183\253\&5\142|8*\135\176\253j\"X \\\DC4\155\141\129\230\224\&9\145\188*J%\SUB\216Xp\216\153\203Q\238#ykW\154Z\248\252$\169"})]

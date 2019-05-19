@@ -14,8 +14,10 @@ import qualified Data.Aeson as J
 import qualified Data.ByteString as B
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
+import qualified Data.ByteString.Base64 as B
 import qualified Data.ByteString.Builder as BB
 import qualified Codec.Serialise as CBOR
 import qualified Yesod.Auth.Message as Msg
@@ -66,7 +68,7 @@ addCommonScripts = do
 
 class YesodAuth site => YesodAuthWebAuthn site where
   webAuthnLookupPubKey :: CredentialId -> AuthHandler site CredentialPublicKey
-  webAuthnAddCredential :: CredentialId -> CredentialPublicKey -> AuthHandler site ()
+  webAuthnAddCredential :: User -> CredentialId -> CredentialPublicKey -> AuthHandler site ()
   webAuthnRegisterHandler :: AuthHandler site Html
   webAuthnRegisterHandler = do
     userId <- liftIO $ J.toJSON <$> B.unpack <$> getRandomBytes 64
@@ -82,20 +84,21 @@ class YesodAuth site => YesodAuthWebAuthn site where
         <input type="text" id="webauthn-display-name">
         <button id="webauthn-register">Register</button>
         <div id="webauthn-result">
+        <div id="webauthn-log">
       |]
       toWidget [Julius.julius|
         document.getElementById("webauthn-register").addEventListener("click"
           , function(e){
             getJSON("/auth/page/webauthn/challenge", function(challenge){
               let rawChallenge = base64js.toByteArray(challenge);
-              let userId = new Uint8Array(#{userId});
+              let user = {
+                  id: new Uint8Array(#{userId}),
+                  name: document.getElementById("webauthn-full-name").value,
+                  displayName: document.getElementById("webauthn-display-name").value
+                  };
               let info =
                   { challenge: rawChallenge
-                  , user: {
-                    id: userId,
-                    name: document.getElementById("webauthn-full-name").value,
-                    displayName: document.getElementById("webauthn-display-name").value
-                    }
+                  , user: user
                   , timeout: 60000
                   , rp: {name: "localhost"}
                   , pubKeyCredParams:
@@ -107,13 +110,16 @@ class YesodAuth site => YesodAuthWebAuthn site where
                 .then((cred) => {
                   postJSON("/auth/page/webauthn/register"
                     , CBOR.encode(
-                        [ new Uint8Array(cred.response.clientDataJSON)
+                        [ user
+                        , new Uint8Array(cred.response.clientDataJSON)
                         , new Uint8Array(cred.response.attestationObject)
                         , new Uint8Array(rawChallenge)])
                     , function(resp)
                       {
                         window.localStorage.setItem('webauthn-cred-id', cred.id);
-                        dump(resp);
+                        var msg = document.createElement('div');
+                        msg.innerText = "Succesfully submitted" + cred.id;
+                        document.getElementById('webauthn-log').appendChild(msg);
                       });
                 })
                 .catch((err) => {
@@ -124,14 +130,22 @@ class YesodAuth site => YesodAuthWebAuthn site where
         );|]
   webAuthnLoginHandler :: WidgetFor site ()
   webAuthnLoginHandler = do
+    y <- getYesod
     addCommonScripts
-    [whamlet|<button id="webauthn-login">Login with WebAuthn</login>|]
+    [whamlet|
+      <button id="webauthn-login">
+        Login with WebAuthn
+      <input type="text" id="webauthn-id" placeholder="credential ID">
+      <div id="webauthn-log">
+    |]
     toWidget [Julius.js|
+      var idInput = document.getElementById('webauthn-id');
+      idInput.value = window.localStorage.getItem('webauthn-cred-id');
       document.getElementById("webauthn-login").addEventListener("click"
         , function(e){
           getJSON("/auth/page/webauthn/challenge", function(challenge){
             let rawChallenge = base64js.toByteArray(challenge);
-            let credStr = window.localStorage.getItem('webauthn-cred-id');
+            let credStr = idInput.value;
             let credId = base64js.toByteArray((credStr + '==='.slice((credStr.length + 3) % 4))
                 .replace(/-/g, '+')
                 .replace(/_/g, '/'));
@@ -142,7 +156,6 @@ class YesodAuth site => YesodAuthWebAuthn site where
               , timeout: 60000
               }})
               .then((cred) => {
-                console.log("NEW CREDENTIAL", cred);
                 CBOR.encode(cred.response);
                 postJSON("/auth/page/webauthn/verify"
                   , CBOR.encode(
@@ -153,7 +166,10 @@ class YesodAuth site => YesodAuthWebAuthn site where
                       , new Uint8Array(rawChallenge)])
                   , function(resp)
                     {
-                      dump(resp);
+                      var msg = document.createElement('a');
+                      msg.href = "@{loginDest y}";
+                      msg.innerText = "Proceed";
+                      document.getElementById('webauthn-log').appendChild(msg);
                     });
               })
               .catch((err) => {
@@ -180,17 +196,19 @@ authWebAuthn theRelyingParty = AuthPlugin {..} where
     challenge <- liftIO $ generateChallenge 16
     return $ toTypedContent $ J.toJSON challenge
   apDispatch "POST" ["register"] = do
-    (cdj, att, challenge) <- deserialiseBody
+    (user, cdj, att, challenge) <- deserialiseBody
     case registerCredential challenge theRelyingParty Nothing False cdj att of
       Left e -> permissionDenied $ T.pack $ show e
       Right (cid, pub) -> do
-        webAuthnAddCredential cid pub
+        webAuthnAddCredential user cid pub
         return $ toTypedContent ("Success" :: Text)
   apDispatch "POST" ["verify"] = do
     (cid, cdj, ad, sig, challenge) <- deserialiseBody
     pub <- webAuthnLookupPubKey cid
     case verify challenge theRelyingParty Nothing False cdj ad sig pub of
       Left e -> permissionDenied $ T.pack $ show e
-      Right _ -> return $ toTypedContent ()
+      Right _ -> do
+        setCreds False (Creds apName (T.decodeUtf8 $ B.encode $ unCredentialId cid) [])
+        return $ toTypedContent ()
   apDispatch _ _ = notFound
   apLogin _ = webAuthnLoginHandler

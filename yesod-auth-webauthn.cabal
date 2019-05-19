@@ -23,6 +23,8 @@ library
   -- other-extensions:
   build-depends:       base ^>=4.12.0.0
     , bytestring
+    , base64-bytestring
+    , cborg
     , conduit
     , cryptonite
     , yesod-core
@@ -31,6 +33,7 @@ library
     , text
     , aeson
     , shakespeare
+    , unordered-containers
     , webauthn
     , x509
   hs-source-dirs:      src
