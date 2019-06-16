@@ -152,7 +152,7 @@ class YesodAuth site => YesodAuthWebAuthn site where
             navigator.credentials.get({publicKey:
               { challenge: rawChallenge
               , allowCredentials:
-                [ { type: "public-key", id: credId, transports: ["usb"] }]
+                [ { type: "public-key", id: credId, transports: ["usb", "nfc", "ble", "internal"] }]
               , timeout: 60000
               }})
               .then((cred) => {
