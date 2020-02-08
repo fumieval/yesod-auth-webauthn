@@ -199,8 +199,8 @@ authWebAuthn theRelyingParty = AuthPlugin {..} where
     (user, cdj, att, challenge) <- deserialiseBody
     case registerCredential challenge theRelyingParty Nothing False cdj att of
       Left e -> permissionDenied $ T.pack $ show e
-      Right (cid, pub) -> do
-        webAuthnAddCredential user cid pub
+      Right cred -> do
+        webAuthnAddCredential user (credentialId cred) (credentialPublicKey cred)
         return $ toTypedContent ("Success" :: Text)
   apDispatch "POST" ["verify"] = do
     (cid, cdj, ad, sig, challenge) <- deserialiseBody

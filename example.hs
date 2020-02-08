@@ -46,7 +46,7 @@ instance YesodAuth WAuth where
   loginDest _ = AfterLoginR
   logoutDest _ = AuthR LoginR
   authenticate creds = return $ ServerError "undefined"
-  authPlugins _ = [authWebAuthn (defaultRelyingParty $ Origin "https" "localhost" 8080)]
+  authPlugins _ = [authWebAuthn (defaultRelyingParty $ Origin "https" "localhost" (Just 8080))]
   maybeAuthId = lookupSession credsKey
 
 instance YesodAuthWebAuthn WAuth where
